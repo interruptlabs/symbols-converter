@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+[dev-packages]
+black = "*"
+mypy = "*"
+pre-commit = "<2.16.0"
+pytest = "*"
+
+[requires]
+python_version = "3"
