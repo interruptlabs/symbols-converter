@@ -13,13 +13,15 @@ MAGIC = b"Microsoft C/C++ MSF 7.00\r\n\x1A\x44\x53\x00\x00\x00"
 
 def size_blocks(size_bytes: int, block_size: int = DEFAULT_BLOCK_SIZE) -> int:
     # https://gist.github.com/Diggsey/cefdbd068c540a4d0daa
-    if size_bytes == 0xffffffff:
+    if size_bytes == 0xFFFFFFFF:
         return 0
     else:
         return (size_bytes + (block_size - 1)) // block_size
 
 
-def next_block_index(block_index: int, repeat: int = 0, block_size: int = DEFAULT_BLOCK_SIZE) -> int:
+def next_block_index(
+    block_index: int, repeat: int = 0, block_size: int = DEFAULT_BLOCK_SIZE
+) -> int:
     for _ in range(repeat + 1):
         block_index = block_index + 1
 
@@ -76,9 +78,18 @@ class MSF:
             num_blocks: int
             stream_directory_size_bytes: int
             block_map_index: int
-            block_size, free_block_map_index, num_blocks, stream_directory_size_bytes, _, block_map_index = unpack("<IIIIII", file.read(4 * 6))
+            (
+                block_size,
+                free_block_map_index,
+                num_blocks,
+                stream_directory_size_bytes,
+                _,
+                block_map_index,
+            ) = unpack("<IIIIII", file.read(4 * 6))
 
-            stream_directory_size_blocks: int = size_blocks(stream_directory_size_bytes, block_size=block_size)
+            stream_directory_size_blocks: int = size_blocks(
+                stream_directory_size_bytes, block_size=block_size
+            )
 
             file.seek(block_map_index * block_size)
 
@@ -93,11 +104,15 @@ class MSF:
                 file.seek(stream_directory_index * block_size)
 
                 if stream_directory_index == stream_directory_indexes[-1]:
-                    stream_directory.write(file.read(high_mod(stream_directory_size_bytes, block_size)))
+                    stream_directory.write(
+                        file.read(high_mod(stream_directory_size_bytes, block_size))
+                    )
                 else:
                     stream_directory.write(file.read(block_size))
 
-            assert stream_directory.tell() == stream_directory_size_bytes, "Stream directory size mismatch."
+            assert (
+                stream_directory.tell() == stream_directory_size_bytes
+            ), "Stream directory size mismatch."
 
             stream_directory.seek(0)
 
@@ -111,18 +126,24 @@ class MSF:
             stream_size_bytes: int
             for stream_size_bytes in stream_sizes_bytes:
                 # https://gist.github.com/Diggsey/cefdbd068c540a4d0daa
-                if stream_size_bytes == 0xffffffff:
+                if stream_size_bytes == 0xFFFFFFFF:
                     streams_indexes.append(None)
                 else:
                     streams_indexes.append([])
 
                     assert streams_indexes[-1] is not None
 
-                    for _ in range(size_blocks(stream_size_bytes, block_size=block_size)):
-                        streams_indexes[-1].append(unpack("<I", stream_directory.read(4))[0])
+                    for _ in range(
+                        size_blocks(stream_size_bytes, block_size=block_size)
+                    ):
+                        streams_indexes[-1].append(
+                            unpack("<I", stream_directory.read(4))[0]
+                        )
 
             stream_indexes: Optional[list[int]]
-            for stream_size_bytes, stream_indexes in zip(stream_sizes_bytes, streams_indexes):
+            for stream_size_bytes, stream_indexes in zip(
+                stream_sizes_bytes, streams_indexes
+            ):
                 if stream_indexes is None:
                     self.streams.append(None)
                 else:
@@ -135,7 +156,9 @@ class MSF:
                         file.seek(stream_index * block_size)
 
                         if stream_index == stream_indexes[-1]:
-                            self.streams[-1].write(file.read(high_mod(stream_size_bytes, block_size)))
+                            self.streams[-1].write(
+                                file.read(high_mod(stream_size_bytes, block_size))
+                            )
                         else:
                             self.streams[-1].write(file.read(block_size))
 
@@ -155,19 +178,26 @@ class MSF:
         for stream in self.streams:
             # https://gist.github.com/Diggsey/cefdbd068c540a4d0daa
             if stream is None:
-                stream_size_bytes = 0xffffffff
+                stream_size_bytes = 0xFFFFFFFF
             else:
                 stream.seek(0, 2)
                 stream_size_bytes = stream.tell()
 
-                assert stream_size_bytes < 0xffffffff, "Stream too large."
+                assert stream_size_bytes < 0xFFFFFFFF, "Stream too large."
 
             stream_sizes_bytes.append(stream_size_bytes)
 
-        stream_sizes_blocks: list[int] = [size_blocks(stream_size_bytes, block_size=block_size) for stream_size_bytes in stream_sizes_bytes]
+        stream_sizes_blocks: list[int] = [
+            size_blocks(stream_size_bytes, block_size=block_size)
+            for stream_size_bytes in stream_sizes_bytes
+        ]
 
-        stream_directory_size_bytes: int = (1 + len(self.streams) + sum(stream_sizes_blocks)) * 4
-        stream_directory_size_blocks: int = size_blocks(stream_directory_size_bytes, block_size=block_size)
+        stream_directory_size_bytes: int = (
+            1 + len(self.streams) + sum(stream_sizes_blocks)
+        ) * 4
+        stream_directory_size_blocks: int = size_blocks(
+            stream_directory_size_bytes, block_size=block_size
+        )
 
         stream_directory: BinaryIO = BytesIO()
 
@@ -176,7 +206,9 @@ class MSF:
         for stream_size_bytes in stream_sizes_bytes:
             stream_directory.write(pack("<I", stream_size_bytes))
 
-        block_index: int = next_block_index(0, repeat=1 + stream_directory_size_blocks, block_size=block_size)
+        block_index: int = next_block_index(
+            0, repeat=1 + stream_directory_size_blocks, block_size=block_size
+        )
         stream_size_blocks: int
         for stream_size_blocks in stream_sizes_blocks:
             for _ in range(stream_size_blocks):
@@ -195,9 +227,17 @@ class MSF:
         super_block: BinaryIO = BytesIO()
 
         super_block.write(MAGIC)
-        super_block.write(pack("<IIIIII", block_size, 1, num_blocks, stream_directory_size_bytes, 0, 3))
+        super_block.write(
+            pack(
+                "<IIIIII", block_size, 1, num_blocks, stream_directory_size_bytes, 0, 3
+            )
+        )
 
-        header_streams: list[Optional[BinaryIO]] = [super_block, block_map, stream_directory]
+        header_streams: list[Optional[BinaryIO]] = [
+            super_block,
+            block_map,
+            stream_directory,
+        ]
         streams: list[Optional[BinaryIO]] = header_streams + self.streams
 
         block_index = 0
@@ -224,7 +264,9 @@ class MSF:
 
                         bits_size: int = (num_blocks - bits_written) % (block_size * 8)
 
-                        file.write(free_block_map_block(bits_size, block_size=block_size))
+                        file.write(
+                            free_block_map_block(bits_size, block_size=block_size)
+                        )
 
                         bits_written += bits_size
 
@@ -236,6 +278,16 @@ class MSF:
                         break
 
 
-if __name__ == '__main__':
-    msf = MSF(file=open("/Users/oshawk/Documents/PwnAdventure3/PwnAdventure3/Binaries/Win32/GameLogic.pdb", "rb"))
-    msf.write(file=open("/Users/oshawk/Documents/PwnAdventure3/PwnAdventure3/Binaries/Win32/GameLogicM.pdb", "wb"))
+if __name__ == "__main__":
+    msf = MSF(
+        file=open(
+            "/Users/oshawk/Documents/PwnAdventure3/PwnAdventure3/Binaries/Win32/GameLogic.pdb",
+            "rb",
+        )
+    )
+    msf.write(
+        file=open(
+            "/Users/oshawk/Documents/PwnAdventure3/PwnAdventure3/Binaries/Win32/GameLogicM.pdb",
+            "wb",
+        )
+    )
