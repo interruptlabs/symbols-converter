@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from sc.pdb import MSF
+from sc.pdb.msf import MSF
 
 
 def test_msf():
