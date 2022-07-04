@@ -22,8 +22,7 @@ elif argument == "test-strict":
     to_check = []
 
     for child in (base_directory / "sc").iterdir():
-        print(child)
-        if child.is_dir() and child.name != "tests" and not child.name.startswith("__"):
+        if child.name != "tests" and not child.name.startswith("__"):
             to_check.append(f"sc/{child.name}")
 
     system(f"""mypy --strict {" ".join(to_check)}""")
