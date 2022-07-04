@@ -3,7 +3,7 @@ from io import BytesIO
 from sc.pdb import MSF
 
 
-def test_pdb():
+def test_msf():
     msf = MSF()
 
     stream_1 = msf.new_stream()
