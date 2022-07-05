@@ -4,7 +4,7 @@ repos:
     hooks:
       - id: mypy
         args: [--check-untyped-defs, --ignore-missing-imports]
-        additional_dependencies: [pytest]
+        additional_dependencies: [pytest, types-requests]
   - repo: https://github.com/psf/black
     rev: stable
     hooks:

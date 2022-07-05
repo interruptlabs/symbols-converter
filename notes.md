@@ -31,12 +31,16 @@ objcopy --extract-symbol
 
 Seems to zero all sections except `.symtab`, `.strtab` and `.shstrtab` .
 
+If `INCLUDE_STANDALONE_SYM_TBL` is disabled, a `.sym` is created.
+
+The `util/download_sym_files.py` script downloads `.sym` files from GitHub to analyse.
+
 ## Plans
 
 - Explore the VS code extension. The VSIX package can be obtained [here](https://windriver.gallerycdn.vsassets.io/extensions/windriver/windsdksupport/2.5.4/1656760967976/Microsoft.VisualStudio.Services.VSIXPackage). It is just a zip file.
 - Try to build a binary with symbols.
 - Maybe setup VxWorks on Raspberry Pi.
 - Find a copy of `makeSymTbl.tcl`.
-- In the 6.2 kernel developer documentation it mentions using `objcpy` to extract a symbol table. Find the command.
+- In the 6.2 kernel developer documentation it mentions using `objcopy` to extract a symbol table. Find the command.
 - Find out what `INCLUDE_STANDALONE_SYM_TBL` does.
 

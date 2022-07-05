@@ -16,8 +16,8 @@ elif argument == "requirements":
     system("pipenv lock -r > requirements.txt")
     system("pipenv lock -r --dev-only > requirements-dev.txt")
 elif argument == "test":
-    system("mypy --check-untyped-defs .")
-    system("pytest")
+    system("mypy --check-untyped-defs --exclude vxworks .")
+    system("pytest --ignore vxworks")
 elif argument == "test-strict":
     to_check = []
 
