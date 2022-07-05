@@ -1,3 +1,4 @@
 .idea
+vxworks
 *.egg-info
 *.pyc
