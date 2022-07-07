@@ -7,6 +7,8 @@ from enum import IntFlag
 from struct import unpack
 from typing import BinaryIO, Optional
 
+from sc.idb.btree import Page
+
 
 class Header:
     magic: bytes
@@ -70,9 +72,42 @@ class Section:
 
 
 class ID0(Section):
-    def __init__(self, file: BinaryIO, checksum: int) -> None:
+    word_size: int
+    word_format: str
+    next_free_offset: int
+    page_size: int
+    root_page: int
+    record_count: int
+    page_count: int
+    magic: bytes
+    pages: list[Page]
+
+    def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
         print(type(self).__name__)
+
+        self.word_size = word_size
+
+        assert self.word_size in (4, 8), "Bad ID0 word size."
+
+        self.word_format = {4: "I", 8: "Q"}[self.word_size]
+
+        (
+            self.next_free_offset,
+            self.page_size,
+            self.root_page,
+            self.record_count,
+            self.page_count,
+            self.magic,
+        ) = unpack("<IHIIIx9s", file.read(28))
+
+        assert self.magic == b"B-tree v2", "Bad IDA0 magic."
+
+        file.seek(self.page_size - 28, 1)
+
+        self.pages = []
+        for _ in range(self.page_count - 1):
+            self.pages.append(Page(file.read(self.page_size)))
 
 
 class ID1(Section):
@@ -119,8 +154,6 @@ class NAM(Section):
             file.read(self.name_count * self.word_size),
         )
 
-        print(self.names)
-
 
 class SEG(Section):
     def __init__(self, file: BinaryIO, checksum: int) -> None:
@@ -157,6 +190,7 @@ class TIL(Section):
 
     def __init__(self, file: BinaryIO, checksum: int) -> None:
         super().__init__(file, checksum)
+        print(type(self).__name__)
 
         flags: int
         (
@@ -207,7 +241,9 @@ class IDB:
 
         if self.header.id0_offset != 0:
             file.seek(self.header.id0_offset)
-            self.id0 = ID0(file, self.header.id0_checksum)
+            self.id0 = ID0(
+                file, self.header.id0_checksum, 8 if self.header.magic == b"IDA2" else 4
+            )
         else:
             self.id0 = None
 

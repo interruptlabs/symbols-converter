@@ -11,7 +11,7 @@ else:
     argument = ""
 
 if argument == "format":
-    system("black .")
+    system("black --exclude vxworks .")
 elif argument == "requirements":
     system("pipenv lock -r > requirements.txt")
     system("pipenv lock -r --dev-only > requirements-dev.txt")
