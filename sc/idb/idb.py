@@ -4,7 +4,7 @@
 # https://github.com/aerosoul94/tilutil
 
 from enum import IntFlag
-from struct import unpack
+from struct import pack, unpack
 from typing import BinaryIO, Optional, Sequence
 
 from sc.idb.btree.idb import (
@@ -14,6 +14,7 @@ from sc.idb.btree.idb import (
     Page as IDBPage,
 )
 from sc.idb.btree.python import (
+    Entry as PythonEntry,
     IndexEntry as PythonIndexEntry,
     IndexPage as PythonIndexPage,
     LeafEntry as PythonLeafEntry,
@@ -166,6 +167,16 @@ class ID0(Section):
             idb_pages.append(IDBPage(file.read(self.page_size)))
 
         self.root_page = resolve_page(self.root_page_index, idb_pages, {})
+
+    def name(self, name: int) -> Optional[bytes]:
+        key: bytes = pack(f">s{self.word_format}s", b".", name, b"N")
+
+        entry: Optional[PythonEntry] = self.root_page.search(key, key, True, True)
+
+        if entry is not None:
+            return entry.value
+        else:
+            return None
 
 
 class ID1(Section):
@@ -336,12 +347,3 @@ class IDB:
             self.id2 = ID2(file, self.header.id2_checksum)
         else:
             self.id2 = None
-
-
-if __name__ == "__main__":
-    i = IDB(
-        open(
-            "../../vxworks/tp-link_TL-WR543G_firmware_ida_databases/wr543gv1_070809.idb",
-            "rb",
-        )
-    )

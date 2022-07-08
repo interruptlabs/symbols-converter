@@ -1,4 +1,4 @@
-from sc.idb.btree.python import LeafEntry, LeafPage, IndexPage, IndexEntry
+from sc.idb.btree.python import IndexEntry, IndexPage, LeafEntry, LeafPage
 
 
 def test_btree_python():

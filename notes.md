@@ -44,3 +44,8 @@ The `util/download_sym_files.py` script downloads `.sym` files from GitHub to an
 - In the 6.2 kernel developer documentation it mentions using `objcopy` to extract a symbol table. Find the command.
 - Find out what `INCLUDE_STANDALONE_SYM_TBL` does.
 
+## Next Steps
+
+- Parse the `ID1` section.
+- Extract the symbols.
+
