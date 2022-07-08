@@ -25,18 +25,6 @@ class Entry:
         record_offset += self.value_length
 
 
-class IndexEntry(Entry):
-    page: int
-
-    def __init__(self, data: bytes, offset: int, last_key: bytes) -> None:
-        super().__init__(data, offset, last_key)
-
-        record_offset: int
-        self.page, record_offset = unpack("<IH", data[offset : offset + 6])
-
-        self.process_record(data, record_offset)
-
-
 class LeafEntry(Entry):
     indent: int
 
@@ -51,16 +39,28 @@ class LeafEntry(Entry):
         self.key = last_key[0 : self.indent] + self.key
 
 
+class IndexEntry(Entry):
+    page_index: int
+
+    def __init__(self, data: bytes, offset: int, last_key: bytes) -> None:
+        super().__init__(data, offset, last_key)
+
+        record_offset: int
+        self.page_index, record_offset = unpack("<IH", data[offset : offset + 6])
+
+        self.process_record(data, record_offset)
+
+
 class Page:
-    first_page_number: int
+    first_page_index: int
     count: int
     entries: list[Entry]
 
     def __init__(self, data: bytes) -> None:
-        self.first_page_number, self.count = unpack("<IH", data[0:6])
+        self.first_page_index, self.count = unpack("<IH", data[0:6])
 
         entry_type: Type[Entry]
-        if self.first_page_number:
+        if self.first_page_index:
             entry_type = IndexEntry
         else:
             entry_type = LeafEntry

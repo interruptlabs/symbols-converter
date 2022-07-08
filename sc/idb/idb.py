@@ -5,9 +5,21 @@
 
 from enum import IntFlag
 from struct import unpack
-from typing import BinaryIO, Optional
+from typing import BinaryIO, Optional, Sequence
 
-from sc.idb.btree import Page
+from sc.idb.btree.idb import (
+    Entry as IDBEntry,
+    IndexEntry as IDBIndexEntry,
+    LeafEntry as IDBLeafEntry,
+    Page as IDBPage,
+)
+from sc.idb.btree.python import (
+    IndexEntry as PythonIndexEntry,
+    IndexPage as PythonIndexPage,
+    LeafEntry as PythonLeafEntry,
+    LeafPage as PythonLeafPage,
+    Page as PythonPage,
+)
 
 
 class Header:
@@ -71,16 +83,60 @@ class Section:
         # TODO: Checksum verification.
 
 
+def resolve_page(
+    page_index: int, idb_pages: Sequence[IDBPage], python_pages: dict[int, PythonPage]
+) -> PythonPage:
+    if page_index in python_pages:
+        return python_pages[page_index]
+
+    idb_page: IDBPage = idb_pages[page_index - 1]
+
+    idb_entry: IDBEntry
+    python_page: PythonPage
+    if idb_page.first_page_index:  # Index
+        python_index_entries: list[PythonIndexEntry] = []
+        last_page_index = idb_page.first_page_index
+        for idb_entry in idb_page.entries:
+            assert isinstance(idb_entry, IDBIndexEntry), "UNEXPECTED"
+
+            python_index_entries.append(
+                PythonIndexEntry(
+                    idb_entry.key,
+                    idb_entry.value,
+                    resolve_page(last_page_index, idb_pages, python_pages),
+                    resolve_page(idb_entry.page_index, idb_pages, python_pages),
+                )
+            )
+
+            last_page_index = idb_entry.page_index
+
+        python_page = PythonIndexPage(python_index_entries)
+    else:  # Leaf
+        python_leaf_entries: list[PythonLeafEntry] = []
+        for idb_entry in idb_page.entries:
+            assert isinstance(idb_entry, IDBLeafEntry), "UNEXPECTED"
+
+            python_leaf_entries.append(PythonLeafEntry(idb_entry.key, idb_entry.value))
+
+        python_page = PythonLeafPage(python_leaf_entries)
+
+    python_pages[page_index] = python_page
+
+    print(len(python_pages))
+
+    return python_page
+
+
 class ID0(Section):
     word_size: int
     word_format: str
     next_free_offset: int
     page_size: int
-    root_page: int
+    root_page_index: int
     record_count: int
     page_count: int
     magic: bytes
-    pages: list[Page]
+    root_page: PythonPage
 
     def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
@@ -95,7 +151,7 @@ class ID0(Section):
         (
             self.next_free_offset,
             self.page_size,
-            self.root_page,
+            self.root_page_index,
             self.record_count,
             self.page_count,
             self.magic,
@@ -105,9 +161,27 @@ class ID0(Section):
 
         file.seek(self.page_size - 28, 1)
 
-        self.pages = []
-        for _ in range(self.page_count - 1):
-            self.pages.append(Page(file.read(self.page_size)))
+        idb_pages: list[IDBPage] = []
+        page_index: int = 1
+        highest_page_index: int = self.page_count - 1
+        while page_index <= highest_page_index:
+            idb_pages.append(IDBPage(file.read(self.page_size)))
+
+            # The page count doesn't seem to be reliable, hence this rigmarole.
+            if idb_pages[-1].first_page_index:
+                highest_page_index = max(
+                    highest_page_index, idb_pages[-1].first_page_index
+                )
+
+                idb_entry: IDBEntry
+                for idb_entry in idb_pages[-1].entries:
+                    assert isinstance(idb_entry, IDBIndexEntry), "UNEXPECTED"
+
+                    highest_page_index = max(highest_page_index, idb_entry.page_index)
+
+            page_index += 1
+
+        self.root_page = resolve_page(self.root_page_index, idb_pages, {})
 
 
 class ID1(Section):
