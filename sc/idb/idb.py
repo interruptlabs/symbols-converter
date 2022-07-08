@@ -122,8 +122,6 @@ def resolve_page(
 
     python_pages[page_index] = python_page
 
-    print(len(python_pages))
-
     return python_page
 
 
@@ -162,24 +160,10 @@ class ID0(Section):
         file.seek(self.page_size - 28, 1)
 
         idb_pages: list[IDBPage] = []
-        page_index: int = 1
-        highest_page_index: int = self.page_count - 1
-        while page_index <= highest_page_index:
+        # The page count does not include dead entries.
+        # TODO: Detect dead entries at this stage? Are they distinguished in any way?
+        for _ in range((self.header.section_length // self.page_size) - 1):
             idb_pages.append(IDBPage(file.read(self.page_size)))
-
-            # The page count doesn't seem to be reliable, hence this rigmarole.
-            if idb_pages[-1].first_page_index:
-                highest_page_index = max(
-                    highest_page_index, idb_pages[-1].first_page_index
-                )
-
-                idb_entry: IDBEntry
-                for idb_entry in idb_pages[-1].entries:
-                    assert isinstance(idb_entry, IDBIndexEntry), "UNEXPECTED"
-
-                    highest_page_index = max(highest_page_index, idb_entry.page_index)
-
-            page_index += 1
 
         self.root_page = resolve_page(self.root_page_index, idb_pages, {})
 
