@@ -3,7 +3,7 @@
 # https://github.com/Vector35/idb-parser-rs
 # https://github.com/aerosoul94/tilutil
 
-from enum import IntFlag
+from enum import Flag, IntFlag, auto
 from struct import pack, unpack
 from typing import BinaryIO, Optional, Sequence
 
@@ -21,6 +21,20 @@ from sc.idb.btree.python import (
     LeafPage as PythonLeafPage,
     Page as PythonPage,
 )
+
+WORD_SIZES: dict[bytes, int] = {b"IDA0": 4, b"IDA1": 4, b"IDA2": 8}
+
+WORD_FORMATS: dict[int, str] = {4: "I", 8: "Q"}
+
+
+class SectionFlags(Flag):
+    ID0 = auto()
+    ID1 = auto()
+    NAM = auto()
+    SEG = auto()
+    TIL = auto()
+    ID2 = auto()
+    ALL = ID0 | ID1 | NAM | SEG | TIL | ID2
 
 
 class Header:
@@ -143,9 +157,7 @@ class ID0(Section):
 
         self.word_size = word_size
 
-        assert self.word_size in (4, 8), "Bad ID0 word size."
-
-        self.word_format = {4: "I", 8: "Q"}[self.word_size]
+        self.word_format = WORD_FORMATS[self.word_size]
 
         (
             self.next_free_offset,
@@ -179,14 +191,63 @@ class ID0(Section):
             return None
 
 
+class ID1Segment:
+    start: int
+    end: int
+    data: bytes
+
+    def __init__(self, start: int, end: int, data: bytes) -> None:
+        assert (end - start) * 4 == len(data), "Bad ID1 segment data length."
+
+        self.start = start
+        self.end = end
+        self.data = data
+
+
 class ID1(Section):
-    def __init__(self, file: BinaryIO, checksum: int) -> None:
+    PAGE_SIZE: int = 0x2000
+
+    word_size: int
+    word_format: str
+    magic: bytes
+    segment_count: int
+    page_count: int
+    segments: list[ID1Segment]
+
+    def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
         print(type(self).__name__)
 
+        self.word_size = word_size
+
+        self.word_format = WORD_FORMATS[self.word_size]
+
+        (self.magic, self.segment_count, self.page_count) = unpack(
+            "<4s4xI4xI", file.read(20)
+        )
+
+        assert self.magic == b"VA*\x00", "Invalid ID1 magic."
+
+        start: int
+        end: int
+        segment_addresses: list[tuple[int, int]] = []
+        for _ in range(self.segment_count):
+            start, end = unpack(
+                f"<{self.word_format}{self.word_format}",
+                file.read(self.word_size * 2),
+            )
+
+            segment_addresses.append((start, end))
+
+        file.seek(20 + (self.segment_count * self.word_size * 2), 1)
+
+        self.segments = []
+        for start, end in segment_addresses:
+            self.segments.append(ID1Segment(start, end, file.read((end - start) * 4)))
+
 
 class NAM(Section):
-    PAGE_SIZE = 0x2000
+    PAGE_SIZE: int = 0x2000
 
     word_size: int
     word_format: str
@@ -202,9 +263,7 @@ class NAM(Section):
 
         self.word_size = word_size
 
-        assert self.word_size in (4, 8), "Bad NAM word size."
-
-        self.word_format = {4: "I", 8: "Q"}[self.word_size]
+        self.word_format = WORD_FORMATS[self.word_size]
 
         (self.magic, self.non_empty, self.page_count, self.name_count) = unpack(
             f"<4s4xI4xI{self.word_size}xI", file.read(24 + self.word_size)
@@ -305,44 +364,48 @@ class IDB:
     til: Optional[TIL]
     id2: Optional[ID2]
 
-    def __init__(self, file: BinaryIO) -> None:
+    def __init__(
+        self, file: BinaryIO, sections: SectionFlags = SectionFlags.ALL
+    ) -> None:
         self.header = Header(file)
 
-        if self.header.id0_offset != 0:
+        if self.header.id0_offset != 0 and sections & SectionFlags.ID0:
             file.seek(self.header.id0_offset)
             self.id0 = ID0(
-                file, self.header.id0_checksum, 8 if self.header.magic == b"IDA2" else 4
+                file, self.header.id0_checksum, WORD_SIZES[self.header.magic]
             )
         else:
             self.id0 = None
 
-        if self.header.id1_offset != 0:
+        if self.header.id1_offset != 0 and sections & SectionFlags.ID1:
             file.seek(self.header.id1_offset)
-            self.id1 = ID1(file, self.header.id1_checksum)
+            self.id1 = ID1(
+                file, self.header.id1_checksum, WORD_SIZES[self.header.magic]
+            )
         else:
             self.id1 = None
 
-        if self.header.nam_offset != 0:
+        if self.header.nam_offset != 0 and sections & SectionFlags.NAM:
             file.seek(self.header.nam_offset)
             self.nam = NAM(
-                file, self.header.nam_checksum, 8 if self.header.magic == b"IDA2" else 4
+                file, self.header.nam_checksum, WORD_SIZES[self.header.magic]
             )
         else:
             self.nam = None
 
-        if self.header.seg_offset != 0:
+        if self.header.seg_offset != 0 and sections & SectionFlags.SEG:
             file.seek(self.header.seg_offset)
             self.seg = SEG(file, self.header.seg_checksum)
         else:
             self.seg = None
 
-        if self.header.til_offset != 0:
+        if self.header.til_offset != 0 and sections & SectionFlags.TIL:
             file.seek(self.header.til_offset)
             self.til = TIL(file, self.header.til_checksum)
         else:
             self.til = None
 
-        if self.header.id2_offset != 0:
+        if self.header.id2_offset != 0 and sections & SectionFlags.ID2:
             file.seek(self.header.id2_offset)
             self.id2 = ID2(file, self.header.id2_checksum)
         else:
