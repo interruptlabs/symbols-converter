@@ -1,8 +1,63 @@
-from struct import pack, unpack
-from typing import Generator, Optional, Union
+from struct import calcsize, pack, unpack
+from typing import Any, Generator, Optional, Union
 
 from sc.idb.btree.python import Entry
 from sc.idb.idb import ID0
+
+
+def unpack_t(data: bytes, offset: int) -> tuple[int, int]:
+    """
+    Unpacks up to a two byte value.
+    The number of bytes used is one more than the number of proceeding ones.
+    """
+
+    first_byte: int = data[offset]
+
+    if first_byte & 0b11000000 == 0b11000000:
+        return int.from_bytes(data[offset + 1 : offset + 3], "big"), 3
+    elif first_byte & 0b10000000 == 0b10000000:
+        return int.from_bytes(data[offset : offset + 2], "big") & 0b011111111111111, 2
+    else:
+        return first_byte, 1
+
+
+def unpack_u(data: bytes, offset: int) -> tuple[int, int]:
+    """
+    Unpacks up to a four byte value.
+    The number of bytes used is one or two more than the number of proceeding ones.
+    """
+
+    first_byte: int = data[offset]
+
+    if first_byte & 0b11100000 == 0b11100000:
+        return int.from_bytes(data[offset + 1 : offset + 5], "big"), 5
+    elif first_byte & 0b11000000 == 0b11000000:
+        return (
+            int.from_bytes(data[offset : offset + 4], "big")
+            & 0b00111111111111111111111111111111,
+            4,
+        )
+    elif first_byte & 0b10000000 == 0b10000000:
+        return int.from_bytes(data[offset : offset + 2], "big") & 0b0111111111111111, 2
+    else:
+        return first_byte, 1
+
+
+def unpack_v(data: bytes, offset: int) -> tuple[int, int]:
+    """
+    Unpacks up to an eight byte value.
+    Represented as two consecutive Us.
+    """
+
+    upper_result: int
+    upper_size: int
+    upper_result, upper_size = unpack_u(data, offset)
+
+    lower_result: int
+    lower_size: int
+    lower_result, lower_size = unpack_u(data, offset + upper_size)
+
+    return (upper_result << 32) + lower_result, upper_size + lower_size
 
 
 class NetNode:
@@ -136,39 +191,76 @@ class NetNode:
 
             key = entry.key
 
-    def alt(self, index: int) -> int:
-        return int.from_bytes(self.entry(b"A", index).value, "little", signed=True)
+    def unpack(self, format_: str, data: bytes) -> tuple[Any, ...]:
+        """
+        Extends regular unpack to support IDA's proprietary packing mechanism.
 
-    def alts(self, signed: bool = False) -> Generator[tuple[int, int], None, None]:
-        entry: Entry
-        for entry in self.entries(b"A"):
-            yield self.key_index(entry.key, signed=signed), int.from_bytes(
-                entry.value, "little", signed=True
-            )
+        Adds:
+        - T: Up to a two-byte value.
+        - U: Up to a four-byte value.
+        - V: Up to an eight-byte value.
+        - *: Up to a word-size-byte value.
+        """
 
-    def hash(self, index: int) -> bytes:
-        return self.entry(b"H", index).value
+        big_endian: bool = True
+        repeat_count: int = 0
+        offset: int = 0
+        results: list[Any] = []
 
-    def hashes(self, signed: bool = False) -> Generator[tuple[int, bytes], None, None]:
-        entry: Entry
-        for entry in self.entries(b"H"):
-            yield self.key_index(entry.key, signed=signed), entry.value
+        size: int
+        index: int
+        value: str
+        for index, value in enumerate(format_):
+            if index == 0 and value in "<>":
+                if value == "<":
+                    big_endian = False
 
-    def sup(self, index) -> bytes:
-        return self.entry(b"S", index).value
+                continue
 
-    def sups(self, signed: bool = False) -> Generator[tuple[int, bytes], None, None]:
-        entry: Entry
-        for entry in self.entries(b"S"):
-            yield self.key_index(entry.key, signed=signed), entry.value
+            if value in "0123456789":
+                repeat_count *= 10
+                repeat_count += int(value)
 
-    def value(self, index) -> bytes:
-        return self.entry(b"V", index).value
+                continue
 
-    def values(self, signed: bool = False) -> Generator[tuple[int, bytes], None, None]:
-        entry: Entry
-        for entry in self.entries(b"V"):
-            yield self.key_index(entry.key, signed=signed), entry.value
+            if repeat_count == 0:
+                repeat_count = 1
+
+            if value in "xcbB?hHiIlLqQnNefdspP":  # Regular format specifiers.
+                size = calcsize(f"{repeat_count}{value}")
+
+                if big_endian:
+                    results += unpack(
+                        f">{repeat_count}{value}", data[offset : offset + size]
+                    )
+                else:
+                    results += unpack(
+                        f">{repeat_count}{value}", data[offset : offset + size]
+                    )
+
+                offset += size
+            elif value in "TUV*":  # Custom format specifiers.
+                result: int
+                for _ in range(repeat_count):
+                    if value == "T":
+                        result, size = unpack_t(data, offset)
+                    elif value == "U" or (value == "*" and self.id0.word_size == 4):
+                        result, size = unpack_u(data, offset)
+                    elif value == "V" or (value == "*" and self.id0.word_size == 8):
+                        result, size = unpack_v(data, offset)
+                    else:
+                        assert False, "UNEXPECTED"
+
+                    results.append(result)
+                    offset += size
+            else:
+                raise ValueError(
+                    f"""Invalid character "{value}" at index {index} in format."""
+                )
+
+            repeat_count = 0
+
+        return tuple(results)
 
 
 class NetNodeGenerator:
