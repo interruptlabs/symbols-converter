@@ -374,6 +374,11 @@ class IDB:
             self.id0 = ID0(
                 file, self.header.id0_checksum, WORD_SIZES[self.header.magic]
             )
+
+            print(
+                hex(self.header.id0_offset),
+                hex(self.id0.header.section_length + self.header.id0_offset),
+            )
         else:
             self.id0 = None
 

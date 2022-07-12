@@ -191,15 +191,17 @@ class NetNode:
 
             key = entry.key
 
-    def unpack(self, format_: str, data: bytes) -> tuple[Any, ...]:
+    def unpack(
+        self, format_: str, data: bytes, return_offset: bool = False
+    ) -> tuple[Any, ...]:
         """
         Extends regular unpack to support IDA's proprietary packing mechanism.
 
-        Adds:
+        Adds (upper for unsigned and lower for signed):
         - T: Up to a two-byte value.
         - U: Up to a four-byte value.
         - V: Up to an eight-byte value.
-        - *: Up to a word-size-byte value.
+        - W: Up to a word-size-byte value.
         """
 
         big_endian: bool = True
@@ -239,15 +241,34 @@ class NetNode:
                     )
 
                 offset += size
-            elif value in "TUV*":  # Custom format specifiers.
+            elif value in "TUVWtuvw":  # Custom format specifiers.
                 result: int
                 for _ in range(repeat_count):
-                    if value == "T":
+                    if value.upper() == "T":
                         result, size = unpack_t(data, offset)
-                    elif value == "U" or (value == "*" and self.id0.word_size == 4):
+                        result = int.from_bytes(
+                            result.to_bytes(2, "big", signed=False),
+                            "big",
+                            signed=value.islower(),
+                        )
+                    elif value.upper() == "U" or (
+                        value.upper() == "W" and self.id0.word_size == 4
+                    ):
                         result, size = unpack_u(data, offset)
-                    elif value == "V" or (value == "*" and self.id0.word_size == 8):
+                        result = int.from_bytes(
+                            result.to_bytes(4, "big", signed=False),
+                            "big",
+                            signed=value.islower(),
+                        )
+                    elif value.upper() == "V" or (
+                        value.upper() == "W" and self.id0.word_size == 8
+                    ):
                         result, size = unpack_v(data, offset)
+                        result = int.from_bytes(
+                            result.to_bytes(8, "big", signed=False),
+                            "big",
+                            signed=value.islower(),
+                        )
                     else:
                         assert False, "UNEXPECTED"
 
@@ -259,6 +280,9 @@ class NetNode:
                 )
 
             repeat_count = 0
+
+        if return_offset:
+            results.append(offset)
 
         return tuple(results)
 
