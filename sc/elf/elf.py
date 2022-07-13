@@ -114,6 +114,10 @@ class ProgramHeader:
             raise TypeError("Invalid combination of arguments.")
 
     def _init_file(self, file: BinaryIO, elf_header: ELFHeader) -> None:
+        assert elf_header.e_phentsize == 8 + (
+            6 * elf_header.word_size
+        ), "Program header size mismatch."
+
         p_type: int
         (p_type,) = unpack(f"{elf_header.endian_format}I", file.read(4))
 
@@ -131,7 +135,8 @@ class ProgramHeader:
             (self.p_flags,) = unpack(f"{elf_header.endian_format}I", file.read(4))
 
         (self.p_align,) = unpack(
-            f"{elf_header.endian_format}{elf_header.word_format}", file.read(4)
+            f"{elf_header.endian_format}{elf_header.word_format}",
+            file.read(elf_header.word_size),
         )
 
 
@@ -156,6 +161,10 @@ class SectionHeader:
             raise TypeError("Invalid combination of arguments.")
 
     def _init_file(self, file: BinaryIO, elf_header: ELFHeader) -> None:
+        assert elf_header.e_shentsize == 16 + (
+            6 * elf_header.word_size
+        ), "Section header size mismatch."
+
         sh_type: int
         sh_flags: int
         (
@@ -176,3 +185,121 @@ class SectionHeader:
 
         self.sh_type = SHType(sh_type)
         self.sh_flags = SHFlags(sh_flags)
+
+
+class Section:
+    name: bytes
+    type: SHType
+    flags: SHFlags
+    address: int
+    link: int
+    info: int
+    alignment: int
+    entry_size: int
+
+    def __init__(
+        self,
+        name: bytes,
+        type_: SHType,
+        flags: SHFlags,
+        address: int,
+        link: int,
+        info: int,
+        alignment: int,
+        entry_size: int,
+    ) -> None:
+        self.name = name
+        self.type = type_
+        self.flags = flags
+        self.address = address
+        self.link = link
+        self.info = info
+        self.alignment = alignment
+        self.entry_size = entry_size
+
+    def __bytes__(self) -> bytes:
+        pass
+
+
+class BytesSection(Section):
+    data: bytes
+
+    def __init__(
+        self,
+        file: Optional[BinaryIO] = None,
+        header: Optional[SectionHeader] = None,
+        name: Optional[bytes] = None,
+    ) -> None:
+        if file is not None and header is not None and name is not None:
+            super().__init__(
+                name,
+                header.sh_type,
+                header.sh_flags,
+                header.sh_addr,
+                header.sh_link,
+                header.sh_info,
+                header.sh_addralign,
+                header.sh_entsize,
+            )
+            self._init_file(file, header)
+        else:
+            raise TypeError("Invalid combination of arguments.")
+
+    def _init_file(self, file: BinaryIO, header: SectionHeader) -> None:
+        file.seek(header.sh_offset, 0)
+
+        self.data = file.read(header.sh_size)
+
+    def __bytes__(self) -> bytes:
+        return self.data
+
+
+class ELF:
+    sections: list[Section]
+
+    def __init__(self, file: Optional[BinaryIO] = None) -> None:
+        if file is not None:
+            self._init_file(file)
+        else:
+            raise TypeError("Invalid combination of arguments.")
+
+    def _init_file(self, file: BinaryIO) -> None:
+        file.seek(0, 0)
+
+        elf_header: ELFHeader = ELFHeader(file=file)
+
+        file.seek(elf_header.e_phoff, 0)
+
+        program_headers: list[ProgramHeader] = []
+        for _ in range(elf_header.e_phnum):
+            program_headers.append(ProgramHeader(file=file, elf_header=elf_header))
+
+        file.seek(elf_header.e_shoff, 0)
+
+        section_headers: list[SectionHeader] = []
+        for _ in range(elf_header.e_shnum):
+            section_headers.append(SectionHeader(file=file, elf_header=elf_header))
+
+        shstrtab_header: SectionHeader = section_headers[elf_header.e_shstrndx]
+
+        file.seek(shstrtab_header.sh_offset, 0)
+
+        shstrtab: bytes = file.read(shstrtab_header.sh_size)
+
+        shstrtab_strings: dict[int, bytes] = {}
+        shstrtab_offset: int = 0
+        shstrtab_string: bytes
+        for shstrtab_string in shstrtab.split(b"\x00"):
+            shstrtab_strings[shstrtab_offset] = shstrtab_string
+            shstrtab_offset += 1 + len(shstrtab_string)
+
+        self.sections = []
+        section_header: SectionHeader
+        for section_header in section_headers:
+            self.sections.append(
+                BytesSection(
+                    file=file,
+                    header=section_header,
+                    name=shstrtab_strings[section_header.sh_name],
+                )
+            )
