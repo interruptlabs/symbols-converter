@@ -261,6 +261,25 @@ class PType(IntEnum):
     PT_SUNWSTACK = 0x6FFFFFFB
 
 
+class PFlags(IntFlag):
+    PF_X = 1 << 0
+    PF_W = 1 << 1
+    PF_R = 1 << 2
+
+    SHF_MASKOS_0 = 1 << 20
+    SHF_MASKOS_1 = 1 << 21
+    SHF_MASKOS_2 = 1 << 22
+    SHF_MASKOS_3 = 1 << 23
+    SHF_MASKOS_4 = 1 << 24
+    SHF_MASKOS_5 = 1 << 25
+    SHF_MASKOS_6 = 1 << 26
+    SHF_MASKOS_7 = 1 << 27
+    SHF_MASKPROC_0 = 1 << 28
+    SHF_MASKPROC_1 = 1 << 29
+    SHF_MASKPROC_2 = 1 << 30
+    SHF_MASKPROC_3 = 1 << 31
+
+
 class SHType(IntEnum):
     SHT_NULL = 0
     SHT_PROGBITS = 1

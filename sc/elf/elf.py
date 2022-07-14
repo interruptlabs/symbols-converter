@@ -28,9 +28,74 @@ class ELFHeader:
     e_shnum: int
     e_shstrndx: int
 
-    def __init__(self, file: Optional[BinaryIO] = None) -> None:
+    def __init__(
+        self,
+        file: Optional[BinaryIO] = None,
+        e_ident_ei_mag: Optional[bytes] = None,
+        e_ident_ei_class: Optional[EIClass] = None,
+        e_ident_ei_data: Optional[EIData] = None,
+        e_ident_ei_version: Optional[EIVersion] = None,
+        e_ident_ei_osabi: Optional[EIOSABI] = None,
+        e_ident_ei_abiversion: Optional[int] = None,
+        e_ident_ei_pad: Optional[bytes] = None,
+        e_type: Optional[EType] = None,
+        e_machine: Optional[EMachine] = None,
+        e_version: Optional[EVersion] = None,
+        e_entry: Optional[int] = None,
+        e_phoff: Optional[int] = None,
+        e_shoff: Optional[int] = None,
+        e_flags: Optional[int] = None,
+        e_ehsize: Optional[int] = None,
+        e_phentsize: Optional[int] = None,
+        e_phnum: Optional[int] = None,
+        e_shentsize: Optional[int] = None,
+        e_shnum: Optional[int] = None,
+        e_shstrndx: Optional[int] = None,
+    ) -> None:
         if file is not None:
             self._init_file(file)
+        elif (
+            e_ident_ei_mag is not None
+            and e_ident_ei_class is not None
+            and e_ident_ei_data is not None
+            and e_ident_ei_version is not None
+            and e_ident_ei_osabi is not None
+            and e_ident_ei_abiversion is not None
+            and e_ident_ei_pad is not None
+            and e_type is not None
+            and e_machine is not None
+            and e_version is not None
+            and e_entry is not None
+            and e_phoff is not None
+            and e_shoff is not None
+            and e_flags is not None
+            and e_ehsize is not None
+            and e_phentsize is not None
+            and e_phnum is not None
+            and e_shentsize is not None
+            and e_shnum is not None
+            and e_shstrndx is not None
+        ):
+            self.e_ident_ei_mag = e_ident_ei_mag
+            self.e_ident_ei_class = e_ident_ei_class
+            self.e_ident_ei_data = e_ident_ei_data
+            self.e_ident_ei_version = e_ident_ei_version
+            self.e_ident_ei_osabi = e_ident_ei_osabi
+            self.e_ident_ei_abiversion = e_ident_ei_abiversion
+            self.e_ident_ei_pad = e_ident_ei_pad
+            self.e_type = e_type
+            self.e_machine = e_machine
+            self.e_version = e_version
+            self.e_entry = e_entry
+            self.e_phoff = e_phoff
+            self.e_shoff = e_shoff
+            self.e_flags = e_flags
+            self.e_ehsize = e_ehsize
+            self.e_phentsize = e_phentsize
+            self.e_phnum = e_phnum
+            self.e_shentsize = e_shentsize
+            self.e_shnum = e_shnum
+            self.e_shstrndx = e_shstrndx
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -122,7 +187,7 @@ class ELFHeader:
 
 class ProgramHeader:
     p_type: PType
-    p_flags: int
+    p_flags: PFlags
     p_offset: int
     p_vaddr: int
     p_paddr: int
@@ -131,10 +196,38 @@ class ProgramHeader:
     p_align: int
 
     def __init__(
-        self, file: Optional[BinaryIO] = None, elf_header: Optional[ELFHeader] = None
+        self,
+        file: Optional[BinaryIO] = None,
+        elf_header: Optional[ELFHeader] = None,
+        p_type: Optional[PType] = None,
+        p_flags: Optional[PFlags] = None,
+        p_offset: Optional[int] = None,
+        p_vaddr: Optional[int] = None,
+        p_paddr: Optional[int] = None,
+        p_filesz: Optional[int] = None,
+        p_memsz: Optional[int] = None,
+        p_align: Optional[int] = None,
     ) -> None:
         if file is not None and elf_header is not None:
             self._init_file(file, elf_header)
+        elif (
+            p_type is not None
+            and p_flags is not None
+            and p_offset is not None
+            and p_vaddr is not None
+            and p_paddr is not None
+            and p_filesz is not None
+            and p_memsz is not None
+            and p_align is not None
+        ):
+            self.p_type = p_type
+            self.p_flags = p_flags
+            self.p_offset = p_offset
+            self.p_vaddr = p_vaddr
+            self.p_paddr = p_paddr
+            self.p_filesz = p_filesz
+            self.p_memsz = p_memsz
+            self.p_align = p_align
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -148,8 +241,10 @@ class ProgramHeader:
 
         self.p_type = PType(p_type)
 
+        p_flags: int
         if elf_header.word_size == 8:
-            (self.p_flags,) = unpack(f"{elf_header.endian_format}I", file.read(4))
+            (p_flags,) = unpack(f"{elf_header.endian_format}I", file.read(4))
+            self.p_flags = PFlags(p_flags)
 
         self.p_offset, self.p_vaddr, self.p_paddr, self.p_filesz, self.p_memsz = unpack(
             f"{elf_header.endian_format}{elf_header.word_format}{elf_header.word_format}{elf_header.word_format}{elf_header.word_format}{elf_header.word_format}",
@@ -157,14 +252,15 @@ class ProgramHeader:
         )
 
         if elf_header.word_size == 4:
-            (self.p_flags,) = unpack(f"{elf_header.endian_format}I", file.read(4))
+            (p_flags,) = unpack(f"{elf_header.endian_format}I", file.read(4))
+            self.p_flags = PFlags(p_flags)
 
         (self.p_align,) = unpack(
             f"{elf_header.endian_format}{elf_header.word_format}",
             file.read(elf_header.word_size),
         )
 
-    def to_bytes(self, word_size: int, word_format: int, endian_format: int) -> bytes:
+    def to_bytes(self, word_size: int, word_format: str, endian_format: str) -> bytes:
         result: bytearray = bytearray()
 
         result += pack(f"{endian_format}I", self.p_type)
@@ -202,10 +298,44 @@ class SectionHeader:
     sh_entsize: int
 
     def __init__(
-        self, file: Optional[BinaryIO] = None, elf_header: Optional[ELFHeader] = None
+        self,
+        file: Optional[BinaryIO] = None,
+        elf_header: Optional[ELFHeader] = None,
+        sh_name: Optional[int] = None,
+        sh_type: Optional[SHType] = None,
+        sh_flags: Optional[SHFlags] = None,
+        sh_addr: Optional[int] = None,
+        sh_offset: Optional[int] = None,
+        sh_size: Optional[int] = None,
+        sh_link: Optional[int] = None,
+        sh_info: Optional[int] = None,
+        sh_addralign: Optional[int] = None,
+        sh_entsize: Optional[int] = None,
     ) -> None:
         if file is not None and elf_header is not None:
             self._init_file(file, elf_header)
+        elif (
+            sh_name is not None
+            and sh_type is not None
+            and sh_flags is not None
+            and sh_addr is not None
+            and sh_offset is not None
+            and sh_size is not None
+            and sh_link is not None
+            and sh_info is not None
+            and sh_addralign is not None
+            and sh_entsize is not None
+        ):
+            self.sh_name = sh_name
+            self.sh_type = sh_type
+            self.sh_flags = sh_flags
+            self.sh_addr = sh_addr
+            self.sh_offset = sh_offset
+            self.sh_size = sh_size
+            self.sh_link = sh_link
+            self.sh_info = sh_info
+            self.sh_addralign = sh_addralign
+            self.sh_entsize = sh_entsize
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -243,7 +373,7 @@ class SectionHeader:
             self.sh_addr % self.sh_addralign == 0
         ), "Section address not aligned."
 
-    def to_bytes(self, word_size: int, word_format: int, endian_format: int) -> bytes:
+    def to_bytes(self, word_size: int, word_format: str, endian_format: str) -> bytes:
         return pack(
             f"{endian_format}II{word_format}{word_format}{word_format}{word_format}II{word_format}{word_format}",
             self.sh_name,
@@ -298,6 +428,14 @@ class BytesSection(Section):
         file: Optional[BinaryIO] = None,
         header: Optional[SectionHeader] = None,
         name: Optional[bytes] = None,
+        type_: Optional[SHType] = None,
+        flags: Optional[SHFlags] = None,
+        address: Optional[int] = None,
+        link: Optional[int] = None,
+        info: Optional[int] = None,
+        alignment: Optional[int] = None,
+        entry_size: Optional[int] = None,
+        data: bytes = b"",
     ) -> None:
         if file is not None and header is not None and name is not None:
             super().__init__(
@@ -311,6 +449,20 @@ class BytesSection(Section):
                 header.sh_entsize,
             )
             self._init_file(file, header)
+        elif (
+            name is not None
+            and type_ is not None
+            and flags is not None
+            and address is not None
+            and link is not None
+            and info is not None
+            and alignment is not None
+            and entry_size is not None
+        ):
+            super().__init__(
+                name, type_, flags, address, link, info, alignment, entry_size
+            )
+            self.data = data
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -331,6 +483,13 @@ class StringTableSection(Section):
         file: Optional[BinaryIO] = None,
         header: Optional[SectionHeader] = None,
         name: Optional[bytes] = None,
+        type_: Optional[SHType] = None,
+        flags: Optional[SHFlags] = None,
+        address: Optional[int] = None,
+        link: Optional[int] = None,
+        info: Optional[int] = None,
+        alignment: Optional[int] = None,
+        entry_size: Optional[int] = None,
     ) -> None:
         if file is not None and header is not None and name is not None:
             super().__init__(
@@ -344,6 +503,20 @@ class StringTableSection(Section):
                 header.sh_entsize,
             )
             self._init_file(file, header)
+        elif (
+            name is not None
+            and type_ is not None
+            and flags is not None
+            and address is not None
+            and link is not None
+            and info is not None
+            and alignment is not None
+            and entry_size is not None
+        ):
+            super().__init__(
+                name, type_, flags, address, link, info, alignment, entry_size
+            )
+            self.data = bytearray()
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -446,8 +619,8 @@ class SymbolTableEntry:
     def to_bytes(
         self,
         word_size: int,
-        word_format: int,
-        endian_format: int,
+        word_format: str,
+        endian_format: str,
         string_table: StringTableSection,
     ) -> bytes:
         result: bytearray = bytearray()
@@ -483,6 +656,13 @@ class SymbolTableSection(Section):
         elf_header: Optional[ELFHeader] = None,
         string_table: Optional[StringTableSection] = None,
         name: Optional[bytes] = None,
+        type_: Optional[SHType] = None,
+        flags: Optional[SHFlags] = None,
+        address: Optional[int] = None,
+        link: Optional[int] = None,
+        info: Optional[int] = None,
+        alignment: Optional[int] = None,
+        entry_size: Optional[int] = None,
     ) -> None:
         if (
             file is not None
@@ -502,6 +682,19 @@ class SymbolTableSection(Section):
                 header.sh_entsize,
             )
             self._init_file(file, header, elf_header, string_table)
+        elif (
+            name is not None
+            and type_ is not None
+            and flags is not None
+            and address is not None
+            and link is not None
+            and info is not None
+            and alignment is not None
+            and entry_size is not None
+        ):
+            super().__init__(
+                name, type_, flags, address, link, info, alignment, entry_size
+            )
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -528,8 +721,8 @@ class SymbolTableSection(Section):
     def to_bytes(
         self,
         word_size: int,
-        word_format: int,
-        endian_format: int,
+        word_format: str,
+        endian_format: str,
         string_table: StringTableSection,
     ) -> bytes:
         result: bytearray = bytearray()
@@ -628,3 +821,219 @@ class ELF:
             assert section is not None, "UNEXPECTED"
 
             self.sections.append(section)
+
+    def to_bytes(
+        self,
+        _64_bit: bool,
+        big_endian: bool,
+        section_header_string_table_index: Optional[int] = None,
+        symbol_table_string_table_index: Optional[int] = None,
+        abi: EIOSABI = EIOSABI.ELFOSABI_NONE,
+        abi_version: int = 0,
+        type_: EType = EType.ET_NONE,
+        machine: EMachine = EMachine.EM_NONE,
+        entry_pont: int = 0,
+        flags: int = 0,
+    ) -> bytes:
+        section_header_string_table: Section
+        if section_header_string_table_index is None:
+            section_header_string_table_index = len(self.sections)
+
+            section_header_string_table = StringTableSection(
+                name=b".shstrtab",
+                type_=SHType.SHT_STRTAB,
+                flags=SHFlags(0),
+                address=0,
+                link=0,
+                info=0,
+                alignment=1,
+                entry_size=0,
+            )
+
+            self.sections.append(section_header_string_table)
+        else:
+            section_header_string_table = self.sections[
+                section_header_string_table_index
+            ]
+
+        assert section_header_string_table_index is not None, "UNEXPECTED"
+
+        assert isinstance(
+            section_header_string_table, StringTableSection
+        ), "Section at index is not a string table."
+
+        symbol_table_string_table: Section
+        if symbol_table_string_table_index is None:
+            symbol_table_string_table_index = len(self.sections)
+
+            symbol_table_string_table = StringTableSection(
+                name=b".strtab",
+                type_=SHType.SHT_STRTAB,
+                flags=SHFlags(0),
+                address=0,
+                link=0,
+                info=0,
+                alignment=1,
+                entry_size=0,
+            )
+
+            self.sections.append(symbol_table_string_table)
+        else:
+            symbol_table_string_table = self.sections[symbol_table_string_table_index]
+
+        assert symbol_table_string_table_index is not None, "UNEXPECTED"
+
+        assert isinstance(
+            symbol_table_string_table, StringTableSection
+        ), "Section at index is not a string table."
+
+        elf_header: ELFHeader = ELFHeader(
+            e_ident_ei_mag=b"\x7fELF",
+            e_ident_ei_class=EIClass.ELFCLASS64 if _64_bit else EIClass.ELFCLASS32,
+            e_ident_ei_data=EIData.ELFDATA2MSB if big_endian else EIData.ELFDATA2LSB,
+            e_ident_ei_version=EIVersion.EV_CURRENT,
+            e_ident_ei_osabi=abi,
+            e_ident_ei_abiversion=abi_version,
+            e_ident_ei_pad=b"\x00" * 7,
+            e_type=type_,
+            e_machine=machine,
+            e_version=EVersion.EV_CURRENT,
+            e_entry=entry_pont,
+            e_phoff=0,
+            e_shoff=0,
+            e_flags=flags,
+            e_ehsize=0,
+            e_phentsize=0,
+            e_phnum=0,
+            e_shentsize=0,
+            e_shnum=0,
+            e_shstrndx=section_header_string_table_index,
+        )
+
+        section_header_name_offsets: list[int] = []
+        section_header_name_offset: int
+        section_bytes: list[Optional[bytes]] = []
+        section_bytes_: Optional[bytes]
+        section: Section
+        for section in self.sections:
+            section_header_name_offset = section_header_string_table.offset_or_append(
+                section.name
+            )
+            section_header_name_offsets.append(section_header_name_offset)
+
+            if section in (section_header_string_table, symbol_table_string_table):
+                section_bytes_ = None
+            else:
+                if isinstance(section, BytesSection) or isinstance(
+                    section, StringTableSection
+                ):
+                    section_bytes_ = section.to_bytes()
+                elif isinstance(section, SymbolTableSection):
+                    section.link = symbol_table_string_table_index
+                    section.entry_size = 8 + (elf_header.word_size * 2)
+
+                    section_bytes_ = section.to_bytes(
+                        elf_header.word_size,
+                        elf_header.word_format,
+                        elf_header.endian_format,
+                        symbol_table_string_table,
+                    )
+                else:
+                    raise TypeError("Unknown section type.")
+
+            section_bytes.append(section_bytes_)
+
+        section_bytes[
+            section_header_string_table_index
+        ] = section_header_string_table.to_bytes()
+        section_bytes[
+            symbol_table_string_table_index
+        ] = symbol_table_string_table.to_bytes()
+
+        offset: int = 0
+        program_headers: list[ProgramHeader] = []
+        section_headers: list[SectionHeader] = []
+        for section, section_bytes_, section_header_name_offset in zip(
+            self.sections, section_bytes, section_header_name_offsets
+        ):
+            assert section_bytes_ is not None, "UNEXPECTED"
+
+            if section.flags & SHFlags.SHF_ALLOC:
+                program_headers.append(
+                    ProgramHeader(
+                        p_type=PType.PT_LOAD,
+                        p_flags=PFlags.PF_R
+                        | (PFlags.PF_W if section.flags & SHFlags.SHF_WRITE else 0)
+                        | (PFlags.PF_X if section.flags & SHFlags.SHF_EXECINSTR else 0),
+                        p_offset=offset,
+                        p_vaddr=section.address,
+                        p_paddr=section.address,
+                        p_filesz=len(section_bytes_),
+                        p_memsz=len(section_bytes_),
+                        p_align=section.alignment,
+                    )
+                )
+
+            section_headers.append(
+                SectionHeader(
+                    sh_name=section_header_name_offset,
+                    sh_type=section.type,
+                    sh_flags=section.flags,
+                    sh_addr=section.address,
+                    sh_offset=offset,
+                    sh_size=len(section_bytes_),
+                    sh_link=section.link,
+                    sh_info=section.info,
+                    sh_addralign=section.alignment,
+                    sh_entsize=section.entry_size,
+                )
+            )
+
+            offset += len(section_bytes_)
+
+        elf_header.e_phentsize = 8 + (6 * elf_header.word_size)
+        elf_header.e_phnum = len(program_headers)
+
+        elf_header.e_shentsize = 16 + (6 * elf_header.word_size)
+        elf_header.e_shnum = len(section_headers)
+
+        elf_header.e_phoff = len(elf_header.to_bytes())
+
+        offset_adjustment: int = elf_header.e_phoff + (
+            elf_header.e_phnum * elf_header.e_phentsize
+        )
+
+        elf_header.e_shoff = offset + offset_adjustment
+
+        result: list[bytes] = [elf_header.to_bytes()]
+
+        program_header: ProgramHeader
+        for program_header in program_headers:
+            program_header.p_offset += offset_adjustment
+
+            result.append(
+                program_header.to_bytes(
+                    elf_header.word_size,
+                    elf_header.word_format,
+                    elf_header.endian_format,
+                )
+            )
+
+        for section_bytes_ in section_bytes:
+            assert section_bytes_ is not None, "UNEXPECTED"
+
+            result.append(section_bytes_)
+
+        section_header: SectionHeader
+        for section_header in section_headers:
+            section_header.sh_offset += offset_adjustment
+
+            result.append(
+                section_header.to_bytes(
+                    elf_header.word_size,
+                    elf_header.word_format,
+                    elf_header.endian_format,
+                )
+            )
+
+        return b"".join(result)

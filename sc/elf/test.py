@@ -10,3 +10,5 @@ e = ELF(
 assert isinstance(e.sections[18], SymbolTableSection)
 
 print([i.__dict__ for i in e.sections[18].entries])
+
+open("test.elf", "wb").write(e.to_bytes(True, False))
