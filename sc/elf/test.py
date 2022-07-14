@@ -1,4 +1,4 @@
-from sc.elf.elf import ELF
+from sc.elf.elf import ELF, SymbolTableSection
 
 e = ELF(
     file=open(
@@ -7,5 +7,6 @@ e = ELF(
     )
 )
 
-for i in e.sections:
-    print(i.__dict__)
+assert isinstance(e.sections[18], SymbolTableSection)
+
+print([i.__dict__ for i in e.sections[18].entries])
