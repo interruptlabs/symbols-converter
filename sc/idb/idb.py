@@ -153,7 +153,6 @@ class ID0(Section):
 
     def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
         self.word_size = word_size
 
@@ -216,7 +215,6 @@ class ID1(Section):
 
     def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
         self.word_size = word_size
 
@@ -259,7 +257,6 @@ class NAM(Section):
 
     def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
         self.word_size = word_size
 
@@ -286,7 +283,6 @@ class NAM(Section):
 class SEG(Section):
     def __init__(self, file: BinaryIO, checksum: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
 
 class TILFlags(IntFlag):
@@ -318,7 +314,6 @@ class TIL(Section):
 
     def __init__(self, file: BinaryIO, checksum: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
         flags: int
         (
@@ -352,7 +347,6 @@ class TIL(Section):
 class ID2(Section):
     def __init__(self, file: BinaryIO, checksum: int) -> None:
         super().__init__(file, checksum)
-        print(type(self).__name__)
 
 
 class IDB:
@@ -373,11 +367,6 @@ class IDB:
             file.seek(self.header.id0_offset)
             self.id0 = ID0(
                 file, self.header.id0_checksum, WORD_SIZES[self.header.magic]
-            )
-
-            print(
-                hex(self.header.id0_offset),
-                hex(self.id0.header.section_length + self.header.id0_offset),
             )
         else:
             self.id0 = None

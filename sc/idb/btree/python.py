@@ -9,18 +9,6 @@ class Entry:
         self.key = key
         self.value = value
 
-        # if b"a_global_variable_i_have_named" in self.key + self.value:
-        #     print(1, self.key, self.value)
-        #
-        # if b'\xf0" \x80'[::-1] in self.key + self.value:
-        #     print(2, self.key, self.value)
-        #
-        # if b'\x80\x11\xe1\x8c' in self.key + self.value:
-        #     print(3, self.key, self.value)
-        #
-        # if b'\xff\x00\x00V'[::-1] in self.key + self.value:
-        #     print(4, self.key, self.value)
-
     def __repr__(self) -> str:
         return f"Entry<key={repr(self.key)}, value={repr(self.value)}"
 
