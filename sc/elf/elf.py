@@ -435,7 +435,7 @@ class BytesSection(Section):
         info: Optional[int] = None,
         alignment: Optional[int] = None,
         entry_size: Optional[int] = None,
-        data: bytes = b"",
+        data: Optional[bytes] = None,
     ) -> None:
         if file is not None and header is not None and name is not None:
             super().__init__(
@@ -458,6 +458,7 @@ class BytesSection(Section):
             and info is not None
             and alignment is not None
             and entry_size is not None
+            and data is not None
         ):
             super().__init__(
                 name, type_, flags, address, link, info, alignment, entry_size
@@ -579,9 +580,32 @@ class SymbolTableEntry:
         file: Optional[BinaryIO] = None,
         elf_header: Optional[ELFHeader] = None,
         string_table: Optional[StringTableSection] = None,
+        name: Optional[bytes] = None,
+        binding: Optional[STBind] = None,
+        type_: Optional[STType] = None,
+        visibility: Optional[STVisibility] = None,
+        section_index: Optional[int] = None,
+        value: Optional[int] = None,
+        size: Optional[int] = None,
     ) -> None:
         if file is not None and elf_header is not None and string_table is not None:
             self._init_file(file, elf_header, string_table)
+        elif (
+            name is not None
+            and binding is not None
+            and type_ is not None
+            and visibility is not None
+            and section_index is not None
+            and value is not None
+            and size is not None
+        ):
+            self.name = name
+            self.binding = binding
+            self.type = type_
+            self.visibility = visibility
+            self.section_index = section_index
+            self.value = value
+            self.size = size
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -695,6 +719,7 @@ class SymbolTableSection(Section):
             super().__init__(
                 name, type_, flags, address, link, info, alignment, entry_size
             )
+            self.entries = []
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -743,9 +768,28 @@ class SymbolTableSection(Section):
 class ELF:
     sections: list[Section]
 
-    def __init__(self, file: Optional[BinaryIO] = None) -> None:
+    def __init__(
+        self, file: Optional[BinaryIO] = None, undefined_section: Optional[bool] = None
+    ) -> None:
         if file is not None:
             self._init_file(file)
+        elif undefined_section is not None:
+            self.sections = []
+
+            if undefined_section:
+                self.sections.append(
+                    BytesSection(
+                        name=b"",
+                        type_=SHType.SHT_NULL,
+                        flags=SHFlags(0),
+                        address=0,
+                        link=0,
+                        info=0,
+                        alignment=0,
+                        entry_size=0,
+                        data=b"",
+                    )
+                )
         else:
             raise TypeError("Invalid combination of arguments.")
 
@@ -869,7 +913,7 @@ class ELF:
             symbol_table_string_table = StringTableSection(
                 name=b".strtab",
                 type_=SHType.SHT_STRTAB,
-                flags=SHFlags(0),
+                flags=SHFlags.SHF_ALLOC,
                 address=0,
                 link=0,
                 info=0,
