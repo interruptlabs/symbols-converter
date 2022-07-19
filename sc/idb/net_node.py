@@ -49,13 +49,13 @@ def unpack_v(data: bytes, offset: int) -> tuple[int, int]:
     Represented as two consecutive Us.
     """
 
-    upper_result: int
-    upper_size: int
-    upper_result, upper_size = unpack_u(data, offset)
-
     lower_result: int
     lower_size: int
-    lower_result, lower_size = unpack_u(data, offset + upper_size)
+    lower_result, lower_size = unpack_u(data, offset)
+
+    upper_result: int
+    upper_size: int
+    upper_result, upper_size = unpack_u(data, offset + lower_size)
 
     return (upper_result << 32) + lower_result, upper_size + lower_size
 

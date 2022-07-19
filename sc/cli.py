@@ -254,7 +254,7 @@ def from_idb(arguments: Namespace) -> Bundle:
             if not arguments.no_functions:
                 functions[function.head_header.start] = function.name
 
-            names.remove(function.head_header.start)
+            names.discard(function.head_header.start)
         elif arguments.auto_functions:
             functions[
                 function.head_header.start
@@ -338,8 +338,16 @@ def main() -> None:
     with arguments.sym.open("wb") as sym_file:
         sym_file.write(
             elf.to_bytes(
-                arguments._64_bit or bundle._64_bit or True,
-                arguments.big_endian or bundle.big_endian or True,
+                next(
+                    i
+                    for i in (arguments._64_bit, bundle._64_bit, True)
+                    if i is not None
+                ),
+                next(
+                    i
+                    for i in (arguments.big_endian, bundle.big_endian, True)
+                    if i is not None
+                ),
                 abi=arguments.abi or EIOSABI.ELFOSABI_NONE,
                 abi_version=arguments.abi_version or 0,
                 type_=arguments.type or EType.ET_NONE,
