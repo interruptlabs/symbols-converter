@@ -1,6 +1,8 @@
-from argparse import ArgumentParser, Namespace
+import json
+from argparse import ArgumentParser, Namespace, _ArgumentGroup
 from pathlib import Path
-from typing import BinaryIO, Optional
+from sys import stdout
+from typing import BinaryIO, Optional, TextIO, Union
 
 from sc.elf.constants import (
     EIOSABI,
@@ -103,85 +105,118 @@ def resolved_nonexistent(string: str) -> Path:
     return path
 
 
+def resolved_nonexistent_or_stdout(string: str) -> Union[Path, TextIO]:
+    if string == "-":
+        return stdout
+    else:
+        return resolved_nonexistent(string)
+
+
 def parse_arguments() -> Namespace:
     parser: ArgumentParser = ArgumentParser(
         description="Converts an .idb file to a .sym (ELF) file."
     )
 
-    parser.add_argument(
+    inputs: _ArgumentGroup = parser.add_argument_group("inputs")
+
+    inputs.add_argument(
         "-i",
         "--idb",
         type=resolved_file,
-        required=True,
         help="Path of the .idb file (input).",
         metavar="PATH",
     )
 
-    parser.add_argument(
+    outputs: _ArgumentGroup = parser.add_argument_group("outputs")
+
+    outputs.add_argument(
         "-s",
         "--sym",
         type=resolved_nonexistent,
-        required=True,
         help="Path of the .sym file (output).",
         metavar="PATH",
     )
 
-    parser.add_argument(
+    outputs.add_argument(
+        "-j",
+        "--json",
+        type=resolved_nonexistent_or_stdout,
+        help="Path of the .json file (output).",
+        metavar="PATH",
+    )
+
+    outputs.add_argument(
+        "-t",
+        "--txt",
+        type=resolved_nonexistent_or_stdout,
+        help="Path of the .txt file (output).",
+        metavar="PATH",
+    )
+
+    sym_options: _ArgumentGroup = parser.add_argument_group("sym options")
+
+    sym_options.add_argument(
         "-f",
         "--no-functions",
         action="store_true",
         help="Do not include functions in the output.",
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "-F",
         "--auto-functions",
         action="store_true",
         help="Include automatically named functions in the output.",
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "-g",
         "--no-globals",
         action="store_true",
         help="Do not include globals in the output.",
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "-w",
         "--word-size",
         choices=("32", "64"),
         help="The word size of the binary. Defaults to trying to extract from the input file and then 64 bit.",
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "-e",
         "--endianness",
         choices=("little", "big"),
         help="The endianness of the binary. Defaults to trying to extract from the input file and then big endian.",
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "--abi", choices=tuple(i.name[9:] for i in EIOSABI), help="Defaults to NONE"
     )
 
-    parser.add_argument("--abi-version", type=int, help="Defaults to 0.")
+    sym_options.add_argument("--abi-version", type=int, help="Defaults to 0.")
 
-    parser.add_argument(
+    sym_options.add_argument(
         "--type", choices=tuple(i.name[3:] for i in EType), help="Defaults to NONE."
     )
 
-    parser.add_argument(
+    sym_options.add_argument(
         "--machine",
         choices=tuple(i.name[3:] for i in EMachine),
         help="Defaults to NONE.",
     )
 
-    parser.add_argument("--entry-point", type=int, help="Defaults to 0.")
+    sym_options.add_argument("--entry-point", type=int, help="Defaults to 0.")
 
-    parser.add_argument("--flags", type=int, help="Defaults to 0.")
+    sym_options.add_argument("--flags", type=int, help="Defaults to 0.")
 
     arguments: Namespace = parser.parse_args()
+
+    if arguments.idb is None:
+        parser.error("At least one input argument is required.")
+
+    if arguments.sym is None and arguments.json is None and arguments.txt is None:
+        parser.error("At least one output argument is required.")
 
     if arguments.word_size is None:
         arguments._64_bit = None
@@ -275,11 +310,7 @@ def from_idb(arguments: Namespace) -> Bundle:
     return bundle
 
 
-def main() -> None:
-    arguments: Namespace = parse_arguments()
-
-    bundle: Bundle = from_idb(arguments)
-
+def to_sym(arguments: Namespace, bundle: Bundle) -> None:
     elf: ELF = ELF(undefined_section=True)
 
     section: Section
@@ -356,6 +387,65 @@ def main() -> None:
                 flags=arguments.flags or 0,
             )
         )
+
+
+def to_json(arguments: Namespace, bundle: Bundle) -> None:
+    json_: dict[str, dict[str, int]] = {"functions": {}, "globals": {}}
+
+    symbol: Symbol
+    for symbol in bundle.symbols:
+        if symbol.type == SymbolType.FUNCTION:
+            json_["functions"][symbol.name.decode()] = symbol.address
+        elif symbol.type == SymbolType.GLOBAL:
+            json_["globals"][symbol.name.decode()] = symbol.address
+        else:
+            assert False, "UNEXPECTED"
+
+    if isinstance(arguments.json, Path):
+        json_file: TextIO
+        with arguments.json.open("w") as json_file:
+            json.dump(json_, json_file)
+    else:
+        json.dump(json_, arguments.json)
+
+
+def to_txt(arguments: Namespace, bundle: Bundle) -> None:
+    txt_file: TextIO
+    if isinstance(arguments.txt, Path):
+        txt_file = arguments.txt.open("w")
+    else:
+        txt_file = arguments.txt
+
+    txt_file.write("functions:\n")
+
+    symbol: Symbol
+    for symbol in bundle.symbols:
+        if symbol.type == SymbolType.FUNCTION:
+            txt_file.write(f"  {symbol.name.decode()}: 0x{symbol.address:x}\n")
+
+    txt_file.write("globals:\n")
+
+    for symbol in bundle.symbols:
+        if symbol.type == SymbolType.GLOBAL:
+            txt_file.write(f"  {symbol.name.decode()}: 0x{symbol.address:x}\n")
+
+    if isinstance(arguments.txt, Path):
+        txt_file.close()
+
+
+def main() -> None:
+    arguments: Namespace = parse_arguments()
+
+    bundle: Bundle = from_idb(arguments)
+
+    if arguments.sym is not None:
+        to_sym(arguments, bundle)
+
+    if arguments.json is not None:
+        to_json(arguments, bundle)
+
+    if arguments.txt is not None:
+        to_txt(arguments, bundle)
 
 
 if __name__ == "__main__":
