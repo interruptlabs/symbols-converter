@@ -153,42 +153,44 @@ def parse_arguments() -> Namespace:
         metavar="PATH",
     )
 
-    sym_options: _ArgumentGroup = parser.add_argument_group("sym options")
+    options: _ArgumentGroup = parser.add_argument_group("options")
 
-    sym_options.add_argument(
+    options.add_argument(
         "-f",
         "--no-functions",
         action="store_true",
         help="Do not include functions in the output.",
     )
 
-    sym_options.add_argument(
+    options.add_argument(
         "-F",
         "--auto-functions",
         action="store_true",
         help="Include automatically named functions in the output.",
     )
 
-    sym_options.add_argument(
+    options.add_argument(
         "-g",
         "--no-globals",
         action="store_true",
         help="Do not include globals in the output.",
     )
 
-    sym_options.add_argument(
+    options.add_argument(
         "-w",
         "--word-size",
         choices=("32", "64"),
         help="The word size of the binary. Defaults to trying to extract from the input file and then 64 bit.",
     )
 
-    sym_options.add_argument(
+    options.add_argument(
         "-e",
         "--endianness",
         choices=("little", "big"),
         help="The endianness of the binary. Defaults to trying to extract from the input file and then big endian.",
     )
+
+    sym_options: _ArgumentGroup = parser.add_argument_group("sym options")
 
     sym_options.add_argument(
         "--abi", choices=tuple(i.name[9:] for i in EIOSABI), help="Defaults to NONE"
