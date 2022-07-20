@@ -143,7 +143,7 @@ def resolve_page(
 class ID0(Section):
     word_size: int
     word_format: str
-    next_free_offset: int
+    next_free_index: int
     page_size: int
     root_page_index: int
     record_count: int
@@ -159,7 +159,7 @@ class ID0(Section):
         self.word_format = WORD_FORMATS[self.word_size]
 
         (
-            self.next_free_offset,
+            self.next_free_index,
             self.page_size,
             self.root_page_index,
             self.record_count,
