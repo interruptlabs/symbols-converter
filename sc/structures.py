@@ -1,4 +1,4 @@
-from enum import Enum, auto, Flag
+from enum import Enum, Flag, auto
 from typing import Optional
 
 

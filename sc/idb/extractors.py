@@ -14,7 +14,8 @@ class SegmentExtractorSegment:
     end: int
     name_index: int
     name: bytes
-    class_: int
+    class_index: int
+    class_: bytes
     org_base: int
     flags: int
     alignment_codes: int
@@ -32,7 +33,7 @@ class SegmentExtractorSegment:
             self.start,
             self.end,
             self.name_index,
-            self.class_,
+            self.class_index,
             self.org_base,
             self.flags,
             self.alignment_codes,
@@ -52,7 +53,7 @@ class SegmentExtractorSegment:
 
         self.name = segment_strings[self.name_index]
 
-        # TODO: Properly parse class.
+        self.class_ = segment_strings[self.class_index]
 
         assert 0 <= self.bitness <= 2, "Bad segment bitness."
 

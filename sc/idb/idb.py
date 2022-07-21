@@ -2,8 +2,9 @@
 # https://github.com/nlitsme/pyidbutil
 # https://github.com/Vector35/idb-parser-rs
 # https://github.com/aerosoul94/tilutil
-
+import zlib
 from enum import Flag, IntFlag, auto
+from io import BytesIO
 from struct import pack, unpack
 from typing import BinaryIO, Optional, Sequence
 
@@ -78,24 +79,47 @@ class Header:
         assert self.version == 6, "Unsupported version."
 
 
+class CompressionMethod(IntFlag):
+    NONE = 0
+    ZLIB = 2
+
+
 class SectionHeader:
-    compression_method: int
+    compression_method: CompressionMethod
     section_length: int
 
     def __init__(self, file: BinaryIO) -> None:
-        self.compression_method, self.section_length = unpack("<BQ", file.read(9))
+        compression_method: int
+        compression_method, self.section_length = unpack("<BQ", file.read(9))
+
+        self.compression_method = CompressionMethod(compression_method)
 
 
 class Section:
     header: SectionHeader
     checksum: int
 
-    def __init__(self, file: BinaryIO, checksum: int):
+    def __init__(self, file: BinaryIO, checksum: int, verify_checksum: bool = False):
         self.header = SectionHeader(file)
         self.checksum = checksum
 
-        # TODO: Support decompression.
-        # TODO: Checksum verification.
+        if verify_checksum:
+            # TODO: Is it correct to do this before decompression?
+            assert (
+                zlib.crc32(file.read(self.header.section_length)) == self.checksum
+            ), "Invalid section checksum."
+
+            file.seek(-self.header.section_length, 1)
+
+    def decompressed(self, file: BinaryIO) -> tuple[int, BinaryIO]:
+        if self.header.compression_method == CompressionMethod.NONE:
+            return self.header.section_length, file
+        elif self.header.compression_method == CompressionMethod.ZLIB:
+            data: bytes = zlib.decompress(file.read(self.header.section_length))
+
+            return len(data), BytesIO(data)
+        else:
+            assert False, "UNEXPECTED"
 
 
 def resolve_page(
@@ -151,8 +175,17 @@ class ID0(Section):
     magic: bytes
     root_page: PythonPage
 
-    def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self,
+        file: BinaryIO,
+        checksum: int,
+        word_size: int,
+        verify_checksum: bool = False,
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        section_length: int
+        section_length, file = self.decompressed(file)
 
         self.word_size = word_size
 
@@ -174,7 +207,7 @@ class ID0(Section):
         idb_pages: list[IDBPage] = []
         # The page count does not include dead entries.
         # TODO: Detect dead entries at this stage? Are they distinguished in any way?
-        for _ in range((self.header.section_length // self.page_size) - 1):
+        for _ in range((section_length // self.page_size) - 1):
             idb_pages.append(IDBPage(file.read(self.page_size)))
 
         self.root_page = resolve_page(self.root_page_index, idb_pages, {})
@@ -213,8 +246,16 @@ class ID1(Section):
     page_count: int
     segments: list[ID1Segment]
 
-    def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self,
+        file: BinaryIO,
+        checksum: int,
+        word_size: int,
+        verify_checksum: bool = False,
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        _, file = self.decompressed(file)
 
         self.word_size = word_size
 
@@ -255,8 +296,16 @@ class NAM(Section):
     name_count: int
     names: tuple[int, ...]
 
-    def __init__(self, file: BinaryIO, checksum: int, word_size: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self,
+        file: BinaryIO,
+        checksum: int,
+        word_size: int,
+        verify_checksum: bool = False,
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        _, file = self.decompressed(file)
 
         self.word_size = word_size
 
@@ -281,8 +330,12 @@ class NAM(Section):
 
 
 class SEG(Section):
-    def __init__(self, file: BinaryIO, checksum: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self, file: BinaryIO, checksum: int, verify_checksum: bool = False
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        _, file = self.decompressed(file)
 
 
 class TILFlags(IntFlag):
@@ -312,8 +365,12 @@ class TIL(Section):
     size_e: int
     def_align: int
 
-    def __init__(self, file: BinaryIO, checksum: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self, file: BinaryIO, checksum: int, verify_checksum: bool = False
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        _, file = self.decompressed(file)
 
         flags: int
         (
@@ -345,8 +402,12 @@ class TIL(Section):
 
 
 class ID2(Section):
-    def __init__(self, file: BinaryIO, checksum: int) -> None:
-        super().__init__(file, checksum)
+    def __init__(
+        self, file: BinaryIO, checksum: int, verify_checksum: bool = False
+    ) -> None:
+        super().__init__(file, checksum, verify_checksum=verify_checksum)
+
+        _, file = self.decompressed(file)
 
 
 class IDB:
@@ -359,48 +420,66 @@ class IDB:
     id2: Optional[ID2]
 
     def __init__(
-        self, file: BinaryIO, sections: SectionFlags = SectionFlags.ALL
+        self,
+        file: BinaryIO,
+        sections: SectionFlags = SectionFlags.ALL,
+        verify_checksum: bool = False,
     ) -> None:
         self.header = Header(file)
 
         if self.header.id0_offset != 0 and sections & SectionFlags.ID0:
-            file.seek(self.header.id0_offset)
+            file.seek(self.header.id0_offset, 0)
             self.id0 = ID0(
-                file, self.header.id0_checksum, WORD_SIZES[self.header.magic]
+                file,
+                self.header.id0_checksum,
+                WORD_SIZES[self.header.magic],
+                verify_checksum=verify_checksum,
             )
         else:
             self.id0 = None
 
         if self.header.id1_offset != 0 and sections & SectionFlags.ID1:
-            file.seek(self.header.id1_offset)
+            file.seek(self.header.id1_offset, 0)
             self.id1 = ID1(
-                file, self.header.id1_checksum, WORD_SIZES[self.header.magic]
+                file,
+                self.header.id1_checksum,
+                WORD_SIZES[self.header.magic],
+                verify_checksum=verify_checksum,
             )
         else:
             self.id1 = None
 
         if self.header.nam_offset != 0 and sections & SectionFlags.NAM:
-            file.seek(self.header.nam_offset)
+            file.seek(self.header.nam_offset, 0)
             self.nam = NAM(
-                file, self.header.nam_checksum, WORD_SIZES[self.header.magic]
+                file,
+                self.header.nam_checksum,
+                WORD_SIZES[self.header.magic],
+                verify_checksum=verify_checksum,
             )
         else:
             self.nam = None
 
         if self.header.seg_offset != 0 and sections & SectionFlags.SEG:
-            file.seek(self.header.seg_offset)
-            self.seg = SEG(file, self.header.seg_checksum)
+            file.seek(self.header.seg_offset, 0)
+            self.seg = SEG(
+                file, self.header.seg_checksum, verify_checksum=verify_checksum
+            )
         else:
             self.seg = None
 
         if self.header.til_offset != 0 and sections & SectionFlags.TIL:
-            file.seek(self.header.til_offset)
-            self.til = TIL(file, self.header.til_checksum)
+            file.seek(self.header.til_offset, 0)
+            self.til = TIL(
+                file, self.header.til_checksum, verify_checksum=verify_checksum
+            )
         else:
             self.til = None
 
         if self.header.id2_offset != 0 and sections & SectionFlags.ID2:
-            file.seek(self.header.id2_offset)
-            self.id2 = ID2(file, self.header.id2_checksum)
+            file.seek(self.header.id2_offset, 0)
+            self.id2 = ID2(
+                file, self.header.id2_checksum, verify_checksum=verify_checksum
+            )
         else:
             self.id2 = None

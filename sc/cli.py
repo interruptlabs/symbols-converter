@@ -2,7 +2,7 @@ import json
 from argparse import ArgumentParser, Namespace, _ArgumentGroup
 from pathlib import Path
 from sys import stdout
-from typing import BinaryIO, Optional, TextIO, Union
+from typing import BinaryIO, TextIO, Union
 
 from sc.elf.constants import (
     EIOSABI,
@@ -190,6 +190,12 @@ def parse_arguments() -> Namespace:
         help="The endianness of the binary. Defaults to trying to extract from the input file and then big endian.",
     )
 
+    idb_options: _ArgumentGroup = parser.add_argument_group("idb options")
+
+    idb_options.add_argument(
+        "--verify-checksum", action="store_true", help="Verify IDB section checksums."
+    )
+
     sym_options: _ArgumentGroup = parser.add_argument_group("sym options")
 
     sym_options.add_argument(
@@ -246,6 +252,7 @@ def from_idb(arguments: Namespace) -> Bundle:
     idb = IDB(
         file=arguments.idb.open("rb"),
         sections=IDBSectionFlags.ID0 | IDBSectionFlags.NAM,
+        verify_checksum=arguments.verify_checksum,
     )
 
     assert idb.id0 is not None, ".idb does not contain ID0 section."
