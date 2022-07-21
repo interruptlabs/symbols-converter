@@ -52,6 +52,8 @@ class SegmentExtractorSegment:
 
         self.name = segment_strings[self.name_index]
 
+        # TODO: Properly parse class.
+
         assert 0 <= self.bitness <= 2, "Bad segment bitness."
 
         self.bitness = 1 << (self.bitness + 4)

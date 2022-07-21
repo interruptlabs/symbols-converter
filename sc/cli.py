@@ -245,11 +245,10 @@ def parse_arguments() -> Namespace:
 def from_idb(arguments: Namespace) -> Bundle:
     idb = IDB(
         file=arguments.idb.open("rb"),
-        sections=IDBSectionFlags.ID0 | IDBSectionFlags.ID1 | IDBSectionFlags.NAM,
+        sections=IDBSectionFlags.ID0 | IDBSectionFlags.NAM,
     )
 
     assert idb.id0 is not None, ".idb does not contain ID0 section."
-    assert idb.id1 is not None, ".idb does not contain ID1 section."
     assert idb.nam is not None, ".idb does not contain NAM section."
 
     bundle: Bundle = Bundle()
