@@ -48,5 +48,4 @@ pre-commit install
 - Improve test coverage:
   - There are currently no unit tests that use actual `.idb` files.
   - The stream decompression feature hasn't been tested at all.
-- Improve the text output.
 

@@ -424,18 +424,28 @@ def to_txt(arguments: Namespace, bundle: Bundle) -> None:
     else:
         txt_file = arguments.txt
 
-    txt_file.write("functions:\n")
-
+    name_padding: int = 0
+    address_padding: int = 0
     symbol: Symbol
     for symbol in bundle.symbols:
+        name_padding = max(name_padding, len(symbol.name.decode()))
+        address_padding = max(address_padding, len(f"{symbol.address:x}"))
+
+    txt_file.write("functions:\n")
+
+    for symbol in bundle.symbols:
         if symbol.type == SymbolType.FUNCTION:
-            txt_file.write(f"  {symbol.name.decode()}: 0x{symbol.address:x}\n")
+            txt_file.write(
+                f"  {symbol.name.decode(): >{name_padding}}: 0x{symbol.address:0{address_padding}x}\n"
+            )
 
     txt_file.write("globals:\n")
 
     for symbol in bundle.symbols:
         if symbol.type == SymbolType.GLOBAL:
-            txt_file.write(f"  {symbol.name.decode()}: 0x{symbol.address:x}\n")
+            txt_file.write(
+                f"  {symbol.name.decode(): >{name_padding}}: 0x{symbol.address:0{address_padding}x}\n"
+            )
 
     if isinstance(arguments.txt, Path):
         txt_file.close()
