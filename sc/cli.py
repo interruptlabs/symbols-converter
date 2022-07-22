@@ -15,6 +15,11 @@ from sc.elf.constants import (
     STVisibility,
 )
 from sc.elf.elf import BytesSection, ELF, SymbolTableEntry, SymbolTableSection
+from sc.ghidra.xml_ import (
+    XML as GhidraXML,
+    Section as GhidraXMLSection,
+    SectionPermissions as GhidraXMLPermissions,
+)
 from sc.idb.extractors import (
     FunctionExtractor,
     FunctionExtractorFunction,
@@ -117,13 +122,23 @@ def parse_arguments() -> Namespace:
         description="Converts an .idb file to a .sym (ELF) file."
     )
 
-    inputs: _ArgumentGroup = parser.add_argument_group("inputs")
+    inputs: _ArgumentGroup = parser.add_argument_group(
+        "inputs"
+    ).add_mutually_exclusive_group()
 
     inputs.add_argument(
         "-i",
         "--idb",
         type=resolved_file,
         help="Path of the .idb file (input).",
+        metavar="PATH",
+    )
+
+    inputs.add_argument(
+        "-G",
+        "--ghidra-xml",
+        type=resolved_file,
+        help="Path of the Ghidra .xml file (input).",
         metavar="PATH",
     )
 
@@ -220,8 +235,8 @@ def parse_arguments() -> Namespace:
 
     arguments: Namespace = parser.parse_args()
 
-    if arguments.idb is None:
-        parser.error("At least one input argument is required.")
+    if arguments.idb is None and arguments.ghidra_xml is None:
+        parser.error("One input argument is required.")
 
     if arguments.sym is None and arguments.json is None and arguments.txt is None:
         parser.error("At least one output argument is required.")
@@ -318,6 +333,39 @@ def from_idb(arguments: Namespace) -> Bundle:
     return bundle
 
 
+def from_ghidra_xml(arguments: Namespace) -> Bundle:
+    xml: GhidraXML = GhidraXML(arguments.ghidra_xml.open("r"))
+
+    bundle: Bundle = Bundle()
+
+    address: int
+    name: str
+    for address, name in xml.functions.items():
+        bundle.symbols.append(Symbol(name.encode(), address, SymbolType.FUNCTION))
+
+    for address, name in xml.globals_.items():
+        bundle.symbols.append(Symbol(name.encode(), address, SymbolType.GLOBAL))
+
+    section: GhidraXMLSection
+    for section in xml.sections:
+        flags: SectionFlags = SectionFlags(0)
+
+        if section.permissions & GhidraXMLPermissions.R:
+            flags |= SectionFlags.R
+
+        if section.permissions & GhidraXMLPermissions.W:
+            flags |= SectionFlags.W
+
+        if section.permissions & GhidraXMLPermissions.X:
+            flags |= SectionFlags.X
+
+        bundle.sections.append(
+            Section(section.name.encode(), section.start, section.end, flags)
+        )
+
+    return bundle
+
+
 def to_sym(arguments: Namespace, bundle: Bundle) -> None:
     elf: ELF = ELF(undefined_section=True)
 
@@ -328,8 +376,8 @@ def to_sym(arguments: Namespace, bundle: Bundle) -> None:
                 name=section.name,
                 type_=SECTION_TYPES.get(section.name, SHType.SHT_PROGBITS),
                 flags=SECTION_FLAGS.get(section.name, SHFlags.SHF_ALLOC)
-                | (SHFlags.SHF_WRITE if section.flags | SectionFlags.W else 0)
-                | (SHFlags.SHF_EXECINSTR if section.flags | SectionFlags.X else 0),
+                | (SHFlags.SHF_WRITE if section.flags & SectionFlags.W else 0)
+                | (SHFlags.SHF_EXECINSTR if section.flags & SectionFlags.X else 0),
                 address=section.start,
                 link=0,
                 info=0,
@@ -454,7 +502,13 @@ def to_txt(arguments: Namespace, bundle: Bundle) -> None:
 def main() -> None:
     arguments: Namespace = parse_arguments()
 
-    bundle: Bundle = from_idb(arguments)
+    bundle: Bundle
+    if arguments.idb is not None:
+        bundle = from_idb(arguments)
+    elif arguments.ghidra_xml is not None:
+        bundle = from_ghidra_xml(arguments)
+    else:
+        assert False, "UNEXPECTED"
 
     if arguments.sym is not None:
         to_sym(arguments, bundle)
