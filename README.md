@@ -39,3 +39,14 @@ pipenv shell
 pre-commit install
 ```
 
+# Next Steps
+
+- Add more input formats:
+  - Ghidra - Maybe support one of the export formats such as XML.
+- Add more output formats:
+  - PDB - Some work has been done. The format is very complicated though.
+- Improve test coverage:
+  - There are currently no unit tests that use actual `.idb` files.
+  - The stream decompression feature hasn't been tested at all.
+- Improve the text output.
+
