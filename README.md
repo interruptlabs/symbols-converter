@@ -33,7 +33,7 @@ There are a couple of useful scripts:
 
 To set up a development environment, clone the repository and run the following from its root directory:
 
-```python
+```bash
 pipenv install --dev
 pipenv shell
 pre-commit install
@@ -44,7 +44,7 @@ pre-commit install
 - Add more input formats.
 - Add more output formats:
   - PDB - Some work has been done. The format is very complicated though.
-- Make the program properly modular.
+
 - Improve test coverage:
   - There are currently no unit tests that use actual `.idb` files.
   - The stream decompression feature hasn't been tested at all.

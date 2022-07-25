@@ -2,11 +2,12 @@
 # https://github.com/nlitsme/pyidbutil
 # https://github.com/Vector35/idb-parser-rs
 # https://github.com/aerosoul94/tilutil
-import zlib
 from enum import Flag, IntFlag, auto
 from io import BytesIO
 from struct import pack, unpack
 from typing import BinaryIO, Optional, Sequence
+
+import zlib
 
 from sc.idb.btree.idb import (
     Entry as IDBEntry,
