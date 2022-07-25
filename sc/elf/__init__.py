@@ -13,11 +13,10 @@ from sc.elf.constants import (
 )
 from sc.elf.elf import BytesSection, ELF, SymbolTableEntry, SymbolTableSection
 from sc.structures import Bundle, Section, SectionFlags, Symbol, SymbolType
-
-# https://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/specialsections.html
 from sc.util import fnn
 
-SECTION_TYPES: dict[bytes, SHType] = {
+# https://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/specialsections.html
+SECTION_TYPES: dict[bytes, SHType] = {  # Types
     b".bss": SHType.SHT_NOBITS,
     b".comment": SHType.SHT_PROGBITS,
     b".data": SHType.SHT_PROGBITS,
