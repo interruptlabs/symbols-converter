@@ -1,6 +1,6 @@
 # Introduction
 
-`symbols-converter` converts symbols from a `.idb` file to a `.sym`, `.json` or `.txt` file. Use the `-h` option for detailed help.
+`symbols-converter` converts symbols from an IDA `.idb` or Ghidra `.xml` file to a `.sym`, `.json` or `.txt` file. Use the `-h` option for detailed help.
 
 # Installation
 
@@ -46,6 +46,6 @@ pre-commit install
   - PDB - Some work has been done. The format is very complicated though.
 
 - Improve test coverage:
-  - There are currently no unit tests that use actual `.idb` files.
+  - There are currently no unit tests that use actual `.idb` or `.xml` files.
   - The stream decompression feature hasn't been tested at all.
 
