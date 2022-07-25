@@ -34,6 +34,8 @@ class Section:
 
 
 class XML:
+    _64_bit: Optional[bool]
+    big_endian: Optional[bool]
     globals_: dict[int, str]
     functions: dict[int, str]
     sections: list[Section]
@@ -41,7 +43,28 @@ class XML:
     def __init__(self, file: TextIO) -> None:
         root: Element = ElementTree.parse(file).getroot()
 
+        self._64_bit = None
+        self.big_endian = None
+
         parent_element: Optional[Element]
+
+        parent_element = root.find("PROCESSOR")
+        if parent_element is not None:
+            language_provider: set[str] = set(
+                parent_element.attrib["LANGUAGE_PROVIDER"].split(":")
+            )
+
+            if "32" in language_provider:
+                self._64_bit = False
+
+            if "64" in language_provider:
+                self._64_bit = True
+
+            if "LE" in language_provider:
+                self.big_endian = False
+
+            if "BE" in language_provider:
+                self.big_endian = True
 
         parent_element = root.find("SYMBOL_TABLE")
         assert parent_element is not None, "No SYMBOL_TABLE element."

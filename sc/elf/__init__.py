@@ -15,6 +15,8 @@ from sc.elf.elf import BytesSection, ELF, SymbolTableEntry, SymbolTableSection
 from sc.structures import Bundle, Section, SectionFlags, Symbol, SymbolType
 
 # https://refspecs.linuxbase.org/LSB_3.0.0/LSB-PDA/LSB-PDA/specialsections.html
+from sc.util import fnn
+
 SECTION_TYPES: dict[bytes, SHType] = {
     b".bss": SHType.SHT_NOBITS,
     b".comment": SHType.SHT_PROGBITS,
@@ -81,15 +83,22 @@ SYMBOL_TYPES: dict[SymbolType, STType] = {
 def to_sym(arguments: Namespace, bundle: Bundle) -> None:
     elf_: ELF = ELF(undefined_section=True)
 
+    flags: SHFlags
     section: Section
     for section in bundle.sections:
+        flags = SECTION_FLAGS.get(section.name, SHFlags.SHF_ALLOC)
+
+        if section.flags & SectionFlags.W:
+            flags |= SHFlags.SHF_WRITE
+
+        if section.flags & SectionFlags.X:
+            flags |= SHFlags.SHF_EXECINSTR
+
         elf_.sections.append(
             BytesSection(
                 name=section.name,
                 type_=SECTION_TYPES.get(section.name, SHType.SHT_PROGBITS),
-                flags=SECTION_FLAGS.get(section.name, SHFlags.SHF_ALLOC)
-                | (SHFlags.SHF_WRITE if section.flags & SectionFlags.W else 0)
-                | (SHFlags.SHF_EXECINSTR if section.flags & SectionFlags.X else 0),
+                flags=flags,
                 address=section.start,
                 link=0,
                 info=0,
@@ -137,21 +146,13 @@ def to_sym(arguments: Namespace, bundle: Bundle) -> None:
     with arguments.sym.open("wb") as sym_file:
         sym_file.write(
             elf_.to_bytes(
-                next(
-                    i
-                    for i in (arguments._64_bit, bundle._64_bit, True)
-                    if i is not None
-                ),
-                next(
-                    i
-                    for i in (arguments.big_endian, bundle.big_endian, True)
-                    if i is not None
-                ),
-                abi=arguments.abi or EIOSABI.ELFOSABI_NONE,
-                abi_version=arguments.abi_version or 0,
-                type_=arguments.type or EType.ET_NONE,
-                machine=arguments.machine or EMachine.EM_NONE,
-                entry_pont=arguments.entry_point or 0,
-                flags=arguments.flags or 0,
+                fnn(arguments._64_bit, bundle._64_bit, True),
+                fnn(arguments.big_endian, bundle.big_endian, True),
+                abi=fnn(arguments.abi, EIOSABI.ELFOSABI_NONE),
+                abi_version=fnn(arguments.abi_version, 0),
+                type_=fnn(arguments.type, EType.ET_NONE),
+                machine=fnn(arguments.machine, EMachine.EM_NONE),
+                entry_pont=fnn(arguments.entry_point, 0),
+                flags=fnn(arguments.flags, 0),
             )
         )

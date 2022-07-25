@@ -167,10 +167,21 @@ def parse_arguments() -> Namespace:
 
     arguments: Namespace = parser.parse_args()
 
-    if arguments.idb is None and arguments.ghidra_xml is None:
+    from_count: int = 0
+    key: str
+    for key in FROM_MODULES:
+        if getattr(arguments, key) is not None:
+            from_count += 1
+
+    if from_count != 1:
         parser.error("One input argument is required.")
 
-    if arguments.sym is None and arguments.json is None and arguments.txt is None:
+    to_count: int = 0
+    for key in TO_MODULES:
+        if getattr(arguments, key) is not None:
+            to_count += 1
+
+    if to_count == 0:
         parser.error("At least one output argument is required.")
 
     if arguments.word_size is None:

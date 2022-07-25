@@ -13,6 +13,9 @@ def from_ghidra_xml(arguments: Namespace) -> Bundle:
 
     bundle: Bundle = Bundle()
 
+    bundle._64_bit = xml._64_bit
+    bundle.big_endian = xml.big_endian
+
     address: int
     name: str
     for address, name in xml.functions.items():
