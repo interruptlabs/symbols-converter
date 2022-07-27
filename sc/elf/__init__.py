@@ -85,6 +85,10 @@ def to_sym(arguments: Namespace, bundle: Bundle) -> None:
     flags: SHFlags
     section: Section
     for section in bundle.sections:
+        # .dynsym seems to break GDB loading.
+        if not arguments.include_dynsym and section.name == b".dynsym":
+            continue
+
         flags = SECTION_FLAGS.get(section.name, SHFlags.SHF_ALLOC)
 
         if section.flags & SectionFlags.W:

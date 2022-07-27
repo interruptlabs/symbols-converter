@@ -165,6 +165,12 @@ def parse_arguments() -> Namespace:
 
     sym_options.add_argument("--flags", type=int, help="Defaults to 0.")
 
+    sym_options.add_argument(
+        "--include-dynsym",
+        action="store_true",
+        help="Include .dynsym sections. This may break GDB loading.",
+    )
+
     arguments: Namespace = parser.parse_args()
 
     from_count: int = 0
